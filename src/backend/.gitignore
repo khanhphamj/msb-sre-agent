@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+# Allow committing per-environment NON-secret config templates (issuer, JWKS URL, model...)
+!.env.*.example
+.greennode.json
+.agentbase/
+*.credentials.json

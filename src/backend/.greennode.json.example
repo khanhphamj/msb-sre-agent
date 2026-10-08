@@ -1,0 +1,4 @@
+{
+  "client_id": "<IAM service account client id>",
+  "client_secret": "<IAM service account client secret>"
+}

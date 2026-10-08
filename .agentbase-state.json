@@ -1,0 +1,36 @@
+{
+  "wizard_step": 9,
+  "project_name": "msb-sre-agent",
+  "framework": "langgraph",
+  "agent_identity": "msb-sre-agent",
+  "auth_configured": true,
+  "runtime_id": "runtime-843199e5-8e35-4afb-8e8a-85a3186018e1",
+  "memory_id": "memory-f725f6b0-49fc-497e-9965-5118a7ef1c61",
+  "aip_key_name": "msb-sre-agent-key",
+  "cr_repo_name": "111480-abp93356",
+  "gateway_name": "msb-samples-mcp-gateway",
+  "langfuse_project": null,
+  "runtime_identity": "runtime-843199e5-8e35-4afb-8e8a-85a3186018e1",
+  "auth_mode": "api_key",
+  "runtime_endpoint": "https://endpoint-9c5d7eee-5208-4dc9-a1e0-dcf50d8b9403.agentbase-runtime.aiplatform.vngcloud.vn",
+  "network_mode": "PUBLIC",
+  "flavor": "runtime-s2-general-2x4",
+  "replicas": {
+    "min": 1,
+    "max": 1
+  },
+  "image": "vcr.vngcloud.vn/111480-abp93356/msb-sre-agent:v20261007074420",
+  "memory_strategy_id": "ltms-bf8a104b-3b04-41fa-a4bd-4556476d0831",
+  "connector_name": "msb_elasticsearch_onpermise",
+  "policy_group_id": "policygroup_6b6eda54-9c96-4456-a337-0a3cbde8c399",
+  "policies": [
+    "allow-msb-sre-agent-dev",
+    "allow-msb-sre-agent-runtime"
+  ],
+  "zalo": {
+    "bot": "Bot MSB SRE",
+    "token_provider": "msb-sre-zalo-bot-token",
+    "secret_provider": "msb-sre-zalo-webhook-secret",
+    "webhook": "https://endpoint-9c5d7eee-5208-4dc9-a1e0-dcf50d8b9403.agentbase-runtime.aiplatform.vngcloud.vn/webhook/zalo"
+  }
+}

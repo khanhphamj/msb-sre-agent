@@ -1,0 +1,22 @@
+{
+  "servers": {
+    "es": {
+      "transport": "streamable_http",
+      "url": "${MCP_GATEWAY_URL}/msb_elasticsearch_onpermise",
+      "auth": "iam",
+      "envs": [
+        "local",
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "allow_tools": [
+        "get_overview",
+        "search_logs",
+        "get_log_stats",
+        "get_metrics",
+        "get_metrics_summary"
+      ]
+    }
+  }
+}

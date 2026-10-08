@@ -1,0 +1,50 @@
+[project]
+name = "msb-sre-agent-backend"
+version = "0.1.0"
+description = "msb-sre-agent — AgentBase agent backend on GreenNode AgentBase"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # GreenNode AgentBase runtime + memory bridge
+    "greennode-agentbase>=1.0.3",
+    "greennode-agent-bridge[langgraph]>=1.0.5",
+    # Agent framework
+    "langgraph>=1.0.0,<2.0.0",
+    "langchain>=1.0.0,<2.0.0",  # required by langfuse.langchain CallbackHandler
+    "langchain-core>=1.0.0,<2.0.0",
+    "langchain-openai>=1.1.0,<2.0.0",
+    "langchain-mcp-adapters>=0.3.0,<0.4.0",
+    # Observability
+    "langfuse>=4.0.0,<5.0.0",
+    # Config + auth
+    "pydantic>=2.6,<3",  # greennode-agentbase 1.0.x still uses class-based Config (removed in pydantic 3)
+    "pydantic-settings>=2.6.0",
+    "pyjwt[crypto]>=2.14",  # PyJWKClient refetch cooldown (random-kid tokens must not hammer the IdP JWKS)
+    "httpx>=0.27.0",
+    "jsonschema>=4.0",  # validates HITL-edited args of MCP tools (JSON-Schema dicts)
+    "python-dotenv>=1.0.0",
+    "a2a-sdk[http-server]>=1.2,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+]
+
+[tool.uv]
+# The backend is an application, not built as a package.
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC"]
+ignore = ["E501"]  # the formatter handles line length; comments may be long

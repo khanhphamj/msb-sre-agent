@@ -1,0 +1,15 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+# Allow committing per-environment NON-secret config templates (issuer, JWKS URL, model...)
+!.env.*.example
+.greennode.json
+.agentbase/
+*.credentials.json
+**/.venv/
+**/__pycache__/
+**/node_modules/
+src/frontend/.expo/
+# Rendered AgentBase manifest (contains secrets) — only deploy/agent.yaml.tpl is committed
+deploy/agent.yaml

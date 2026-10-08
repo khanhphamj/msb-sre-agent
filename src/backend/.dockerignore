@@ -1,0 +1,21 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+.greennode.json
+.agentbase/
+.agentbase-state.json
+*.credentials.json
+.git/
+tests/
+evals/
+*.md
+!app/prompts/*.md
+# Documents for search_knowledge must be in the image
+!app/knowledge/**
+scripts/

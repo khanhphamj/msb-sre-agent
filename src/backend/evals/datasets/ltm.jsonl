@@ -1,0 +1,1 @@
+{"id": "remember-pref", "input": {"message": "Please remember that I prefer short answers."}, "expected_output": "Confirms it has remembered the preference for short answers.", "metadata": {"expected_tools": ["remember"], "tags": ["memory"]}}

@@ -1,0 +1,11 @@
+{
+  "agents": {
+    "stock-agent": {
+      "url": "${A2A_STOCK_AGENT_URL}",
+      "description": "Agent specialized in looking up & analyzing Vietnamese stocks.",
+      "auth": "api_key",
+      "api_key": "${A2A_STOCK_AGENT_API_KEY}",
+      "enabled": false
+    }
+  }
+}

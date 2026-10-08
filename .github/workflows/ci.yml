@@ -1,0 +1,131 @@
+# msb-sre-agent — CI: lint + test on every push/PR, eval gate, manual deploy to AgentBase.
+# Deploy setup (once per GitHub Environment dev/staging/prod — Settings → Environments, add required reviewers for prod):
+#   secrets: GRN_ACCESS_KEY_ID, GRN_SECRET_ACCESS_KEY (dedicated CI service account), VCR_USERNAME, VCR_PASSWORD
+#            (vCR robot account), LLM_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, EVAL_LLM_API_KEY (repo-level)
+#   vars:    AGENT_NAME, VCR_REGISTRY, VCR_REPO, RUNTIME_FLAVOR, LLM_MODEL, MEMORY_ID, MEMORY_STRATEGY_ID,
+#            AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE, LANGFUSE_BASE_URL, AGENT_ENDPOINT, GRN_DEFAULT_REGION
+# See /agentbase-build-deploy and references/iam-permissions.md.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy_env:
+        description: "Deploy after tests to this GitHub Environment (dev | staging | prod); empty = no deploy"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run pytest -q
+
+  eval:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/backend
+    env:
+      APP_ENV: local
+      AUTH_MODE: none
+      MEMORY_BACKEND: inmemory
+      LLM_API_KEY: ${{ secrets.EVAL_LLM_API_KEY }} # a dedicated key: eval traffic gets its own rate limit
+      LLM_MODEL: ${{ vars.LLM_MODEL }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - name: Eval gate (skipped until EVAL_LLM_API_KEY is configured)
+        if: env.LLM_API_KEY != ''
+        # --concurrency 1: MaaS allows 10 requests/min per account
+        run: >-
+          uv run python -m evals.run_eval --data evals/datasets/smoke.jsonl
+          --min-pass-rate ${{ vars.EVAL_MIN_PASS_RATE || '0.8' }} --concurrency 1
+      - if: env.LLM_API_KEY == ''
+        run: echo "::notice::EVAL_LLM_API_KEY is not set — eval gate skipped"
+
+  deploy:
+    needs: [test, eval]
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_env != ''
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.deploy_env }}
+    env:
+      GRN_VERSION: v1.13.0 # pinned; release assets carry the version suffix (latest/download/grn-linux-amd64 is 404)
+      IMAGE: ${{ vars.VCR_REGISTRY }}/${{ vars.VCR_REPO }}/${{ vars.AGENT_NAME }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install grn (pinned version + SHA256 check)
+        run: |
+          base="https://github.com/GreenNodeHub/greennode-cli/releases/download/${GRN_VERSION}"
+          curl -fsSL -o grn "$base/grn-linux-amd64-${GRN_VERSION}"
+          curl -fsSL -o SHA256SUMS "$base/SHA256SUMS"
+          grep " grn-linux-amd64-${GRN_VERSION}$" SHA256SUMS | awk '{print $1"  grn"}' | sha256sum -c -
+          chmod +x grn && sudo mv grn /usr/local/bin/ && grn --version
+
+      - name: Build and push the image (linux/amd64)
+        env:
+          VCR_USERNAME: ${{ secrets.VCR_USERNAME }}
+          VCR_PASSWORD: ${{ secrets.VCR_PASSWORD }}
+        run: |
+          echo "$VCR_PASSWORD" | docker login "${{ vars.VCR_REGISTRY }}" -u "$VCR_USERNAME" --password-stdin
+          docker build --platform linux/amd64 -t "$IMAGE" src/backend
+          docker push "$IMAGE"
+
+      - name: Render the manifest (secrets stay in the CI secret store, the file is never committed)
+        env:
+          AGENT_NAME: ${{ vars.AGENT_NAME }}
+          APP_ENV: ${{ inputs.deploy_env }}
+          RUNTIME_FLAVOR: ${{ vars.RUNTIME_FLAVOR }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          MEMORY_ID: ${{ vars.MEMORY_ID }}
+          MEMORY_STRATEGY_ID: ${{ vars.MEMORY_STRATEGY_ID }}
+          AUTH_JWKS_URL: ${{ vars.AUTH_JWKS_URL }}
+          AUTH_ISSUER: ${{ vars.AUTH_ISSUER }}
+          AUTH_AUDIENCE: ${{ vars.AUTH_AUDIENCE }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: envsubst < deploy/agent.yaml.tpl > "$RUNNER_TEMP/agent.yaml"
+
+      - name: Deploy (idempotent; waits for ACTIVE)
+        env:
+          GRN_ACCESS_KEY_ID: ${{ secrets.GRN_ACCESS_KEY_ID }}
+          GRN_SECRET_ACCESS_KEY: ${{ secrets.GRN_SECRET_ACCESS_KEY }}
+          GRN_DEFAULT_REGION: ${{ vars.GRN_DEFAULT_REGION || 'HCM-3' }}
+        # Never add `-o json` here: it prints secrets in clear text into the CI log
+        run: |
+          grn agentbase deploy up --file "$RUNNER_TEMP/agent.yaml"
+          grn agentbase deploy status "${{ vars.AGENT_NAME }}"
+
+      - name: Smoke test
+        if: vars.AGENT_ENDPOINT != ''
+        run: curl -fsS --retry 5 --retry-delay 10 "${{ vars.AGENT_ENDPOINT }}/health"
+
+      - name: Remove the rendered manifest
+        if: always()
+        run: rm -f "$RUNNER_TEMP/agent.yaml"
